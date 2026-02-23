@@ -1,0 +1,496 @@
+<roblox version="4">
+  <Item class="ReplicatedFirst" referent="0">
+    <Properties>
+      <string name="Name">ReplicatedFirst</string>
+    </Properties>
+  </Item>
+  <Item class="ReplicatedStorage" referent="1">
+    <Properties>
+      <string name="Name">ReplicatedStorage</string>
+    </Properties>
+    <Item class="ModuleScript" referent="2">
+      <Properties>
+        <string name="Name">Types</string>
+        <string name="Source"><![CDATA[--!strict
+-- Shared types and scaffolding boilerplate
+
+export type FrameworkContext = {
+	-- Add generalized context definitions here
+}
+
+return {}
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="Folder" referent="3">
+      <Properties>
+        <string name="Name">Utils</string>
+      </Properties>
+      <Item class="ModuleScript" referent="4">
+        <Properties>
+          <string name="Name">DayNightCycle</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    DayNightCycle
+    @author DistractedGames
+    @version 2.0.0
+
+    Manages the in-game day/night cycle, driven by a configurable real-world
+    duration. It provides a robust event system to trigger actions at specific
+    times of day (e.g., "Dawn", "Sunset").
+
+    This module is designed to be managed by the ModuleLoader framework,
+    utilizing the Start() lifecycle method, though can be adjusted to fit the
+    project's structure.
+--]]
+
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+-- Assumes use of Logger module
+local Logger = require(ReplicatedStorage.Source.Utility.Logger.Logger)
+
+local logger = Logger.new({
+	Debug = false, -- Toggles verbose logging for this module.
+	Prefix = "DayNightCycle",
+})
+
+local DayNightCycle = {}
+
+--[[
+	Type definition for the module's configuration.
+	- DayLengthInMinutes: Real-world minutes for a full 24-hour game day.
+	- StartTimeOfDay: Optional specific start time in hours (0-24). If nil, uses current lighting.
+	- TimeEvents: A dictionary mapping event names to game hours (0-24).
+]]
+export type DayNightCycleConfig = {
+	DayLengthInMinutes: number,
+	StartTimeOfDay: number?,
+	TimeEvents: { [string]: number },
+}
+
+-- Default configuration, can be customized before Start() is called.
+local config: DayNightCycleConfig = {
+	DayLengthInMinutes = 15, -- 15 real-world minutes for a full game day.
+	StartTimeOfDay = 9.0, -- Start smoothly at 9am
+	TimeEvents = {
+		Dawn = 6.0,
+		Sunrise = 7.0,
+		Midday = 12.0,
+		Sunset = 18.0,
+		Dusk = 19.0,
+		Midnight = 0.0,
+	},
+}
+
+local connection: RBXScriptConnection?
+local isRunning = false
+local lastHourTriggered = -1
+local triggeredEvents: { [string]: boolean } = {}
+local timeRatio = 0
+local cycleStartTime = 0
+
+-- Constants
+local MINUTES_IN_DAY = 1440 -- 24 hours * 60 minutes
+local HOURS_IN_DAY = 24
+
+-- Events
+local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes") or Instance.new("Folder")
+if not remotesFolder.Parent then
+	remotesFolder.Name = "Remotes"
+	remotesFolder.Parent = ReplicatedStorage
+end
+
+DayNightCycle.Events = Instance.new("BindableEvent")
+DayNightCycle.Events.Name = "DayNightEvents"
+DayNightCycle.Events.Parent = remotesFolder
+
+--[[
+	Converts minutes after midnight to a 24-hour format.
+	@param minutes The number of minutes past midnight.
+	@return The time in hours (0-24).
+]]
+local function minutesToHours(minutes: number): number
+	return minutes / 60
+end
+
+--[[
+	Checks and fires time-based events based on the current hour.
+	Resets triggered events daily at midnight.
+	@param currentHour The current in-game hour.
+]]
+local function checkTimeEvents(currentHour: number)
+	if currentHour < lastHourTriggered then
+		-- Midnight has passed, reset all triggered events for the new day.
+		triggeredEvents = {}
+		logger.log("A new day has begun. Resetting daily time events.")
+	end
+	lastHourTriggered = currentHour
+
+	for eventName, eventHour in config.TimeEvents do
+		local hourDifference = math.abs(currentHour - eventHour)
+
+		-- Handle midnight (0.0) being approached from hour 23.
+		if eventHour == 0 and currentHour > 23 then
+			hourDifference = HOURS_IN_DAY - currentHour
+		end
+
+		-- Trigger if we are close to the event time and it hasn't fired yet today.
+		if hourDifference < 0.1 and not triggeredEvents[eventName] then
+			triggeredEvents[eventName] = true
+			DayNightCycle.Events:Fire(eventName, eventHour)
+			logger.log(`Time event triggered: '{eventName}' at {string.format("%.1f", eventHour)}h.`)
+		end
+	end
+end
+
+--[[
+	Core update function connected to Heartbeat. Calculates and sets the
+	new time of day.
+]]
+local function onHeartbeat()
+	local elapsed = time() - cycleStartTime
+	local totalMinutes = (elapsed * timeRatio) % MINUTES_IN_DAY
+
+	Lighting:SetMinutesAfterMidnight(totalMinutes)
+
+	local currentHour = minutesToHours(totalMinutes)
+	checkTimeEvents(currentHour)
+end
+
+--[[
+	[Public Method]
+	Starts the day/night cycle. Connects the update function to RunService.Heartbeat.
+	Calling it again will have no effect.
+]]
+function DayNightCycle.StartCycle()
+	if isRunning then
+		logger.log("StartCycle called but the cycle is already running.", true)
+		return
+	end
+	isRunning = true
+
+	-- Initialize time calculations
+	local dayInSeconds = config.DayLengthInMinutes * 60
+	timeRatio = MINUTES_IN_DAY / dayInSeconds
+	cycleStartTime = time()
+
+	-- Set initial time if specified
+	if config.StartTimeOfDay then
+		local startMinutes = config.StartTimeOfDay * 60
+		Lighting:SetMinutesAfterMidnight(startMinutes)
+		-- Adjust start time to account for the offset
+		cycleStartTime -= (startMinutes / timeRatio)
+	end
+
+	-- Connect to the game loop with a throttled update
+	connection = RunService.Heartbeat:Connect(onHeartbeat)
+
+	logger.log(`Day/Night cycle started. Game day lasts {config.DayLengthInMinutes} real-world minutes.`)
+end
+
+--[[
+	[Public Method]
+	Stops the day/night cycle.
+]]
+function DayNightCycle.StopCycle()
+	if not isRunning then
+		return
+	end
+	isRunning = false
+
+	if connection then
+		connection:Disconnect()
+		connection = nil
+	end
+
+	logger.log("Day/Night cycle stopped.")
+end
+
+--[[
+    [Public Method]
+    Adds or updated a custom time event.
+    @param eventName The unique name for the event.
+    @param eventHour The hour (0-24) to trigger the event.
+]]
+function DayNightCycle.AddTimeEvent(eventName: string, eventHour: number)
+	assert(typeof(eventName) == "string", "eventName must be a string")
+	assert(
+		typeof(eventHour) == "number" and eventHour >= 0 and eventHour < 24,
+		"eventHour must be a number between 0 and 23.99"
+	)
+
+	config.TimeEvents[eventName] = eventHour
+	logger.log(`Added time event: {eventName} at {string.format("%.1f", eventHour)}h.`)
+end
+
+--[[
+	[Public Method]
+	Removes a time event.
+	@param eventName The name of the event to remove.
+	@return True if the event was found and removed, false otherwise.
+--]]
+function DayNightCycle.RemoveTimeEvent(eventName: string): boolean
+	if config.TimeEvents[eventName] then
+		config.TimeEvents[eventName] = nil
+		logger.log(`Removed time event: '{eventName}'.`)
+		return true
+	end
+	logger.log(`Attempted to remove non-existent event: '{eventName}'.`, true)
+	return false
+end
+
+--[[
+    [Public Method]
+    Returns the current in-game time.
+    @return The current time in hours (0-24).
+]]
+function DayNightCycle.GetCurrentTime(): number
+	return minutesToHours(Lighting:GetMinutesAfterMidnight())
+end
+
+--[[
+    ModuleLoader Lifecycle: Start
+    Starts the actual day/night cycle. This runs after all modules have been
+    through their Setup phase.
+    If not using the ModuleLoader, be sure to call DayNightCycle.StartCycle from
+    somewhere else.
+]]
+function DayNightCycle.Start()
+	logger.log(`Starting Day/Night Cycle...`)
+	DayNightCycle.StartCycle()
+end
+
+return table.freeze(DayNightCycle)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="5">
+        <Properties>
+          <string name="Name">Loader</string>
+          <string name="Source"><![CDATA[--!strict
+local Loader = {}
+
+--[=[
+    Loader.Load(folder: Instance)
+    
+    Loads all ModuleScripts in the given folder (non-recursive by default, or recursive if you prefer).
+    
+    Pass 1: Require all modules.
+    Pass 2: Call :Init() on all modules that have it.
+    Pass 3: Call :Start() on all modules that have it.
+    
+    This ensures that by the time :Start() is called, all modules are :Init()ialized.
+]=]
+function Loader.Load(rootFolder: Instance)
+	local modules = {}
+
+	-- 1. Discovery & Require
+	for _, child in ipairs(rootFolder:GetDescendants()) do
+		if child:IsA("ModuleScript") then
+			local success, result = pcall(require, child)
+			if success then
+				if type(result) == "table" then
+					table.insert(modules, {
+						Name = child.Name,
+						Module = result,
+					})
+				end
+			else
+				warn("[Loader] Failed to require module: " .. child.Name .. " | Error: " .. tostring(result))
+			end
+		end
+	end
+
+	-- 2. Init Pass
+	for _, definition in ipairs(modules) do
+		local mod = definition.Module
+		if typeof(mod.Init) == "function" then
+			task.spawn(function()
+				local success, err = pcall(function()
+					mod:Init()
+				end)
+				if not success then
+					warn("[Loader] Error in :Init() for " .. definition.Name .. ": " .. tostring(err))
+				end
+			end)
+		end
+	end
+
+	-- Wait a tick to let Inits settle (optional, but good practice if Init has async work)
+	-- ideally Init should be synchronous for dependency setup, but we'll use task.defer for Start
+
+	-- 3. Start Pass
+	-- We wait for all Inits to fire?
+	-- Strictly speaking, if Init yields, we might have race conditions.
+	-- Standard practice: Init should be synchronous setup.
+
+	for _, definition in ipairs(modules) do
+		local mod = definition.Module
+		if typeof(mod.Start) == "function" then
+			task.defer(function()
+				local success, err = pcall(function()
+					mod:Start()
+				end)
+				if not success then
+					warn("[Loader] Error in :Start() for " .. definition.Name .. ": " .. tostring(err))
+				end
+			end)
+		end
+	end
+
+	print("[Loader] Loaded " .. #modules .. " modules from " .. rootFolder:GetFullName())
+end
+
+return Loader
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="6">
+        <Properties>
+          <string name="Name">TerrainUtil</string>
+          <string name="Source"><![CDATA[--!strict
+local TerrainUtil = {}
+
+function TerrainUtil.GetSeafloorHeight(x: number, z: number, radius: number): number
+	local raycastParams = RaycastParams.new()
+	local terrain = workspace:FindFirstChild("Terrain")
+	if terrain then
+		raycastParams.FilterType = Enum.RaycastFilterType.Include
+		raycastParams.FilterDescendantsInstances = { terrain }
+	else
+		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	end
+	raycastParams.IgnoreWater = true
+
+	local offsets = {
+		Vector3.new(0, 0, 0), -- Center
+		Vector3.new(radius, 0, radius), -- Corner 1
+		Vector3.new(radius, 0, -radius), -- Corner 2
+		Vector3.new(-radius, 0, radius), -- Corner 3
+		Vector3.new(-radius, 0, -radius), -- Corner 4
+	}
+
+	local totalY = 0
+	local hitCount = 0
+
+	for _, offset in ipairs(offsets) do
+		local rayOrigin = Vector3.new(x + offset.X, 500, z + offset.Z)
+		local rayDirection = Vector3.new(0, -1000, 0)
+
+		local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+		if result then
+			totalY += result.Position.Y
+			hitCount += 1
+		end
+	end
+
+	if hitCount > 0 then
+		local avgY = totalY / hitCount
+		return avgY
+	end
+
+	warn("TerrainUtil: No terrain found for height check at " .. x .. ", " .. z)
+	return -100 -- Fallback depth
+end
+
+function TerrainUtil.CreateTunnel(p1: Vector3, p2: Vector3, radius: number)
+	local dist = (p2 - p1).Magnitude
+	if dist < 1 then
+		return
+	end
+
+	local cframe = CFrame.lookAt(p1, p2) * CFrame.new(0, 0, -dist / 2)
+	-- Rotate 90 deg X to align cylinder (Y-axis) with Path (Z-axis)
+	local cylinderCF = cframe * CFrame.Angles(math.rad(90), 0, 0)
+
+	-- 1. Clear with Air (Ensure empty space)
+	workspace.Terrain:FillCylinder(cylinderCF, dist, radius, Enum.Material.Air)
+
+	-- 2. Fill with Water
+	workspace.Terrain:FillCylinder(cylinderCF, dist, radius, Enum.Material.Water)
+end
+
+return TerrainUtil
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="ServerScriptService" referent="7">
+    <Properties>
+      <string name="Name">ServerScriptService</string>
+    </Properties>
+    <Item class="Script" referent="8">
+      <Properties>
+        <string name="Name">ServerLoader</string>
+        <token name="RunContext">0</token>
+        <string name="Source"><![CDATA[local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local Loader = require(ReplicatedStorage.Utils.Loader)
+
+-- Load all services
+local servicesFolder = ServerScriptService:WaitForChild("Services")
+Loader.Load(servicesFolder)
+
+print("Server Bootstrapped via Loader")
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="Folder" referent="9">
+      <Properties>
+        <string name="Name">Services</string>
+      </Properties>
+    </Item>
+  </Item>
+  <Item class="ServerStorage" referent="10">
+    <Properties>
+      <string name="Name">ServerStorage</string>
+    </Properties>
+  </Item>
+  <Item class="StarterGui" referent="11">
+    <Properties>
+      <string name="Name">StarterGui</string>
+    </Properties>
+  </Item>
+  <Item class="StarterPlayer" referent="12">
+    <Properties>
+      <string name="Name">StarterPlayer</string>
+    </Properties>
+    <Item class="StarterCharacterScripts" referent="13">
+      <Properties>
+        <string name="Name">StarterCharacterScripts</string>
+      </Properties>
+    </Item>
+    <Item class="StarterPlayerScripts" referent="14">
+      <Properties>
+        <string name="Name">StarterPlayerScripts</string>
+      </Properties>
+      <Item class="LocalScript" referent="15">
+        <Properties>
+          <string name="Name">ClientLoader</string>
+          <string name="Source"><![CDATA[local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
+local StarterPlayerScripts = Players.LocalPlayer:WaitForChild("PlayerScripts")
+
+local Loader = require(ReplicatedStorage.Utils.Loader)
+
+-- Load all controllers
+local controllersFolder = StarterPlayerScripts:WaitForChild("Controllers")
+Loader.Load(controllersFolder)
+
+print("Client Bootstrapped via Loader")
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="Folder" referent="16">
+        <Properties>
+          <string name="Name">Controllers</string>
+        </Properties>
+      </Item>
+    </Item>
+  </Item>
+</roblox>
