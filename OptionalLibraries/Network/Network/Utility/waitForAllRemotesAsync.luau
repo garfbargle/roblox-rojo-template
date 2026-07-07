@@ -17,14 +17,10 @@ local function waitForAllRemotesAsync(remoteFolder: Folder, timeoutSeconds: numb
 	local remoteEventsFolder = remoteFolder:FindFirstChild(RemoteFolderName.RemoteEvents) :: Folder
 	local remoteFunctionsFolder = remoteFolder:FindFirstChild(RemoteFolderName.RemoteFunctions) :: Folder
 
-	-- Make each set of event and function names read-only.
-	local remoteEvents = table.freeze(RemoteEventName)
-	local remoteFunctions = table.freeze(RemoteFunctionName)
-
 	-- Validate that the remotes defined under RemoteNames exist in remote folders.
 	local success = true
-	local function search(names: { string }, folder: Folder)
-		for _, remoteName in ipairs(names) do
+	local function search(names: { [string]: string }, folder: Folder)
+		for _, remoteName in names do
 			local remote = folder:WaitForChild(remoteName, timeoutSeconds)
 			if not remote then
 				success = false
@@ -33,13 +29,10 @@ local function waitForAllRemotesAsync(remoteFolder: Folder, timeoutSeconds: numb
 		end
 	end
 
-	search(remoteEvents, remoteEventsFolder)
-	search(remoteFunctions, remoteFunctionsFolder)
+	search(RemoteEventName, remoteEventsFolder)
+	search(RemoteFunctionName, remoteFunctionsFolder)
 
-	assert(
-        success,
-        "Network could not find all reemotes. Did the client Network module initialize before the server?"
-    )
+	assert(success, "Network could not find all remotes. Did the client Network module initialize before the server?")
 end
 
 return waitForAllRemotesAsync

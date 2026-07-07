@@ -1,75 +1,80 @@
 --!strict
 local Loader = {}
 
+type ModuleDefinition = {
+	Name: string,
+	Path: string,
+	Module: any,
+}
+
 --[=[
     Loader.Load(folder: Instance)
-    
-    Loads all ModuleScripts in the given folder (non-recursive by default, or recursive if you prefer).
-    
+
+    Loads all ModuleScripts under the given folder.
+
     Pass 1: Require all modules.
     Pass 2: Call :Init() on all modules that have it.
     Pass 3: Call :Start() on all modules that have it.
-    
+
     This ensures that by the time :Start() is called, all modules are :Init()ialized.
 ]=]
-function Loader.Load(rootFolder: Instance)
-	local modules = {}
+function Loader.Load(rootFolder: Instance): { ModuleDefinition }
+	local moduleScripts = {}
+	for _, descendant in rootFolder:GetDescendants() do
+		if descendant:IsA("ModuleScript") then
+			table.insert(moduleScripts, descendant)
+		end
+	end
 
-	-- 1. Discovery & Require
-	for _, child in ipairs(rootFolder:GetDescendants()) do
-		if child:IsA("ModuleScript") then
-			local success, result = pcall(require, child)
-			if success then
-				if type(result) == "table" then
-					table.insert(modules, {
-						Name = child.Name,
-						Module = result,
-					})
-				end
-			else
-				warn("[Loader] Failed to require module: " .. child.Name .. " | Error: " .. tostring(result))
+	table.sort(moduleScripts, function(left, right)
+		return left:GetFullName() < right:GetFullName()
+	end)
+
+	local modules: { ModuleDefinition } = {}
+
+	for _, moduleScript in moduleScripts do
+		local success, result = pcall(require, moduleScript)
+		if success then
+			if type(result) == "table" then
+				table.insert(modules, {
+					Name = moduleScript.Name,
+					Path = moduleScript:GetFullName(),
+					Module = result,
+				})
+			end
+		else
+			warn(`[Loader] Failed to require {moduleScript:GetFullName()}: {tostring(result)}`)
+		end
+	end
+
+	for _, definition in ipairs(modules) do
+		local mod = definition.Module
+		if type(mod.Init) == "function" then
+			local success, err = pcall(function()
+				mod:Init()
+			end)
+			if not success then
+				warn(`[Loader] Error in :Init() for {definition.Path}: {tostring(err)}`)
 			end
 		end
 	end
 
-	-- 2. Init Pass
 	for _, definition in ipairs(modules) do
 		local mod = definition.Module
-		if typeof(mod.Init) == "function" then
-			task.spawn(function()
-				local success, err = pcall(function()
-					mod:Init()
-				end)
-				if not success then
-					warn("[Loader] Error in :Init() for " .. definition.Name .. ": " .. tostring(err))
-				end
-			end)
-		end
-	end
-
-	-- Wait a tick to let Inits settle (optional, but good practice if Init has async work)
-	-- ideally Init should be synchronous for dependency setup, but we'll use task.defer for Start
-
-	-- 3. Start Pass
-	-- We wait for all Inits to fire?
-	-- Strictly speaking, if Init yields, we might have race conditions.
-	-- Standard practice: Init should be synchronous setup.
-
-	for _, definition in ipairs(modules) do
-		local mod = definition.Module
-		if typeof(mod.Start) == "function" then
+		if type(mod.Start) == "function" then
 			task.defer(function()
 				local success, err = pcall(function()
 					mod:Start()
 				end)
 				if not success then
-					warn("[Loader] Error in :Start() for " .. definition.Name .. ": " .. tostring(err))
+					warn(`[Loader] Error in :Start() for {definition.Path}: {tostring(err)}`)
 				end
 			end)
 		end
 	end
 
-	print("[Loader] Loaded " .. #modules .. " modules from " .. rootFolder:GetFullName())
+	print(`[Loader] Loaded {#modules} modules from {rootFolder:GetFullName()}`)
+	return modules
 end
 
 return Loader

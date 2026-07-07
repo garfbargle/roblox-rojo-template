@@ -11,7 +11,7 @@
     ```lua
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-    local Logger = require(ReplicatedStorage.Source.Utility.Logger)
+    local Logger = require(ReplicatedStorage.Utils.Logger)
 
     local logger = Logger.new({
         Debug = true, -- When true, will print debug messages, when false only warnings/errors
@@ -37,15 +37,15 @@
 ]]
 
 export type LoggerConfig = {
-    Debug: boolean,
-    Prefix: string?, -- Optional prefix for log messages
+	Debug: boolean,
+	Prefix: string?, -- Optional prefix for log messages
 }
 
 export type Logger = {
-    log: (message: string, isWarning: boolean?) -> (),
-    serialize: (value: any) -> string,
-    setConfig: (newConfig: LoggerConfig) -> (),
-    getConfig: () -> LoggerConfig,
+	log: (message: string, isWarning: boolean?) -> (),
+	serialize: (value: any) -> string,
+	setConfig: (newConfig: LoggerConfig) -> (),
+	getConfig: () -> LoggerConfig,
 }
 
 -- Maximum depth for table serialization to prevent infinite loops.
@@ -86,53 +86,53 @@ end
 
 -- Creates a new logger instance with default configuration.
 local function new(initialConfig: LoggerConfig?): Logger
-    local config: LoggerConfig = initialConfig or {
-        Debug = false,
-        Prefix = nil :: string?,
-    }
+	local config: LoggerConfig = initialConfig or {
+		Debug = false,
+		Prefix = nil :: string?,
+	}
 
-    -- Used in lew of a metatable to keep things simple.
-    local logger = {}
+	-- Used in lew of a metatable to keep things simple.
+	local logger = {}
 
-    --[[
+	--[[
         Logs a formatted message to the output.
         Uses `warn` for warnings and `print` for debug messages.
         The log includes the calling function's name and line for easier debugging.
         @param message The core message to log.
         @param isWarning If true, formats the message as a warning.
     ]]
-    function logger.log(message: string, isWarning: boolean?)
-        local prefix = if config.Prefix then `[{config.Prefix}] ` else ""
-        local source, line, funcName = debug.info(2, "sln")
-        local formattedSource = `{string.match(source, "@(.*)")}`
-        local logHeader = `{prefix} [{funcName or formattedSource}:{line}]`
+	function logger.log(message: string, isWarning: boolean?)
+		local prefix = if config.Prefix then `[{config.Prefix}] ` else ""
+		local source, line, funcName = debug.info(2, "sln")
+		local formattedSource = `{string.match(source, "@(.*)")}`
+		local logHeader = `{prefix} [{funcName or formattedSource}:{line}]`
 
-        if isWarning then
-            warn(`{logHeader} {message}`)
-        elseif config.Debug then
-            print(`{logHeader} {message}`)
-        end
-    end
+		if isWarning then
+			warn(`{logHeader} {message}`)
+		elseif config.Debug then
+			print(`{logHeader} {message}`)
+		end
+	end
 
-    -- Used to serialize table values for printing.
-    function logger.serialize(value: any): string
+	-- Used to serialize table values for printing.
+	function logger.serialize(value: any): string
 		return serializeValue(value, 1)
 	end
 
-    -- Used to update Logger configuration anytime after creation.
-    function logger.setConfig(newConfig: LoggerConfig)
-        config.Debug = newConfig.Debug
-        config.Prefix = newConfig.Prefix
-    end
+	-- Used to update Logger configuration anytime after creation.
+	function logger.setConfig(newConfig: LoggerConfig)
+		config.Debug = newConfig.Debug
+		config.Prefix = newConfig.Prefix
+	end
 
-    -- Used to get the current Logger configuration.
-    function logger.getConfig()
-        return table.clone(config)
-    end
+	-- Used to get the current Logger configuration.
+	function logger.getConfig()
+		return table.clone(config)
+	end
 
-    return logger
+	return logger
 end
 
 return {
-    new = new
+	new = new,
 }

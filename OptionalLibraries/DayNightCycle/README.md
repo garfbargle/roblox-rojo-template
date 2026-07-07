@@ -5,11 +5,11 @@ A configurable, event-driven day/night cycle system for Roblox experiences. This
 ## 🚀 Features
 
 - Smoothly updates `Lighting.ClockTime` based on real-world time
-- Supports flexible configuration for cycle speed, update frequency, and start time
+- Supports flexible configuration for cycle speed, named events, and start time
 - **Event-Driven**: Fires custom events at specific in-game hours (e.g. "Dawn", "Sunset")
 - **Dynamic Events**: Add or remove custom time-based events at runtime.
 - **Lifecycle Ready**: Integrates seamlessly with the `ModuleLoader` framework (`Setup` and `Start`).
-- **Integrated Logging**: Uses the `Logger` utility for clear, toggleable debug output.
+- Self-contained debug logging with no external module dependency.
 
 ## 📦 Installation
 
@@ -17,13 +17,10 @@ This is a server-side module. An optimal place for storing `DayNightCycle.luau` 
 
 ```
 ServerScriptService/
-└── Source/
+└── Services/
     └── Environment/
         └── DayNightCycle.luau
 ```
-
-
-> 💡 You may use `/src` instead of `/Source` if preferred — both are supported by the template structure.
 
 ## ⚙️ Configuration
 
@@ -44,7 +41,7 @@ The following options are available in the `config` table along with their defau
 }
 ```
 
-You can modify these values before calling `StartCycle()` or allow the defaults to take effect.
+Use `DayNightCycle.Configure(...)` before calling `StartCycle()` to override defaults.
 
 ## 🧠 Usage
 
@@ -52,13 +49,17 @@ You can modify these values before calling `StartCycle()` or allow the defaults 
 The module is designed to work out-of-the-box. If you're using the [`ModuleLoader`](/PublicModules/ModularFramework/) framework, the `ModuleLoader` will automatically call its `Start()` method, beginning the cycle with the default configuration.
 
 ### Standalone
-If you're not using `ModuleLoader`, you can start the cycle manually:
+If you're not using the loader, you can start the cycle manually:
 
 ```lua
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local DayNightCycle = require(ServerScriptService.Source.Environment.DayNightCycle)
+local DayNightCycle = require(ServerScriptService.Services.Environment.DayNightCycle)
 
+DayNightCycle.Configure({
+    DayLengthInMinutes = 30,
+    StartTimeOfDay = 8,
+})
 DayNightCycle.StartCycle()
 ```
 
@@ -68,11 +69,11 @@ DayNightCycle.AddTimeEvent("EveningRush", 17.5) -- Fires at 5:30 PM
 ```
 
 ### Listening for Events
-The module fires named events via a `BindableEvent` located at `ReplicatedStorage.Remotes.DayNightEvents`. To make other systems react to time changes, connect to the public Events signal from another server script.
+The module fires named events via a `BindableEvent` located at `ReplicatedStorage.Remotes.DayNightEvents`. `BindableEvent` signals are same-context only; server-fired events are for server scripts. Use a `RemoteEvent` if clients need day/night notifications.
 
 **Example: A script that controls streetlights.**
 ```lua
--- Location: ServerScriptService/Source/Systems/LightingManager.server.luau
+-- Location: ServerScriptService/Services/Systems/LightingManager.server.luau
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -101,8 +102,10 @@ DayNightEvents.Event:Connect(onTimeChanged)
 |-------------------------------|-----------------------------------------------|
 | `StartCycle()`                | Begins the day/night cycle                    |
 | `StopCycle()`                 | Stops the cycle and disconnects updates       |
+| `Configure(config)`           | Overrides defaults before the cycle starts    |
+| `GetConfig()`                 | Returns a copy of the current configuration   |
 | `AddTimeEvent(name, hour)`    | Adds or updates a named time event            |
-| `RemoveTimeEvent(name, hour)` | Removes a named time event                    |
+| `RemoveTimeEvent(name)`       | Removes a named time event                    |
 | `GetCurrentTime()`            | Returns the current in-game time (0–24)       |
 | `Start()`                     | Lifecycle method for ModuleLoader integration |
 
@@ -116,12 +119,14 @@ The event that fires when a configured time is reached. It passes two arguments:
 - Uses `RunService.Heartbeat` for smooth time progression.
 
 ## 🧪 Debugging
-Verbose logging can be enabled by setting:
+Verbose logging can be enabled before start:
 
 ```lua
-Debug = true
+DayNightCycle.Configure({
+    Debug = true,
+})
 ```
-in the logger configuration inside the module. This will print detailed messages about time progression and event triggers.
+This will print detailed messages about time progression and event triggers.
 
 ---
 

@@ -17,9 +17,8 @@ Place `Logger.luau` in a shared location such as:
 
 ```
 ReplicatedStorage/
-└── Source/
-    └── Utility/
-        └── Logger.luau
+└── Utils/
+    └── Logger.luau
 ```
 
 
@@ -27,7 +26,7 @@ ReplicatedStorage/
 
 ```lua
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Logger = require(ReplicatedStorage.Source.Utility.Logger)
+local Logger = require(ReplicatedStorage.Utils.Logger)
 
 local logger = Logger.new({
     Debug = true, -- When true, will print debug messages, when false only warnings/errors

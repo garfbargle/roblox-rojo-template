@@ -15,8 +15,8 @@ local RemoteFunctionName = require(script.RemoteName.RemoteFunctionName)
 
 local utility = script.Utility
 local createRemotesFolders = require(utility.createRemotesFolders)
-local waitForAllRemotesAsync = require(utility.waitForAllRemotesAsync)
 local getInstance = require(utility.getInstance)
+local waitForAllRemotesAsync = require(utility.waitForAllRemotesAsync)
 
 -- How long the client will wait for remotes to replicate before erroring.
 local REMOTE_REPLICATION_TIMEOUT_SECONDS = 2
@@ -57,7 +57,7 @@ function Network.startClientAsync()
 	local remoteFolder =
 		REMOTE_FOLDER_PARENT:WaitForChild(REMOTE_FOLDER_NAME, REMOTE_REPLICATION_TIMEOUT_SECONDS) :: Folder
 
-    -- This can occur if the client script running this initializes faster than the server script.
+	-- This can occur if the client script running this initializes faster than the server script.
 	assert(
 		remoteFolder,
 		`Missing remoteFolder folder {REMOTE_FOLDER_NAME}. Did the client Network initialize before the server?`

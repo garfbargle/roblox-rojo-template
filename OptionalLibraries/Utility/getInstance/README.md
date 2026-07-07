@@ -10,10 +10,10 @@ It will throw an error if any part of the path does not exist, helping you catch
 You can require this module and call it with the root instance and a sequence of child names:
 
 ```lua
-local getInstance = require(ReplicatedStorage.Source.Utility.getInstance)
+local getInstance = require(ReplicatedStorage.Utils.getInstance)
 
 local remoteEventsFolder: Folder = getInstance(game.ReplicatedStorage, "RemoteFolder", "RemoteEvents")
-````
+```
 
 * **Parameters:**
 

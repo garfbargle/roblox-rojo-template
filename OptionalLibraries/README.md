@@ -25,13 +25,13 @@ src/
     │   └── Scheduler.lua
     └── TableUtil.lua
 
-````
-> *Note*: The above mentioned libraries are not neccesarily included and are just example names.
+```
+> *Note*: The libraries above are examples and are not necessarily included.
 
 Once added, you can require them like any other module:
 ```lua
 local Signal = require(ReplicatedStorage.libs.Signal)
-````
+```
 
 > 💡 *Tip*: You can remove this entire folder if you don’t plan to use any of these libraries.
 > They are not referenced by the template and will not affect your project.

@@ -14,6 +14,18 @@ The project relies on `aftman` as the toolchain manager. To get started:
 2. `rojo serve`
 3. Connect using the Rojo plugin within Roblox Studio.
 
+## Validation
+Before using this as a project base or after changing the template, run:
+
+```bash
+rojo sourcemap default.project.json --output sourcemap.json
+stylua --check .
+selene .
+python3 -m compileall -q tool/modelsnap
+```
+
+Use `stylua .` to format Luau files.
+
 ## Procedural Model Previews
 
 For procedural parts-based models, use [modelsnap](tool/modelsnap/) to export and render snapshots from the CLI without opening Roblox Studio. This makes it easier to catch placement, rotation, shape, front/back orientation, and visibility issues while iterating on Luau builders.
@@ -22,15 +34,7 @@ Before building or changing procedural models, read the [Procedural Model Buildi
 
 ### modelsnap usage
 
-1. Add repo-root `.luaurc` aliases for the source tree and modelsnap:
-   ```jsonc
-   {
-     "aliases": {
-       "ReplicatedStorage": "./src/ReplicatedStorage",
-       "modelsnap": "./tool/modelsnap"
-     }
-   }
-   ```
+1. The template includes repo-root `.luaurc` aliases for the source tree and modelsnap.
 2. Follow [tool/modelsnap/INTEGRATE.md](tool/modelsnap/INTEGRATE.md) to create the per-game CLI shim and `tool/export_model_snapshot.luau` target list.
 3. Export a snapshot and render it:
    ```bash

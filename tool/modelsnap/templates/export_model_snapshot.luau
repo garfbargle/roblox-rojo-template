@@ -1,4 +1,5 @@
 --!nonstrict
+-- selene: allow(unused_variable)
 -- TEMPLATE — per-game exporter. Copy to tool/export_model_snapshot.luau and add
 -- entries to TARGETS for your game's builders. Each target returns a Model (and
 -- optionally a label); the snapshot JSON is printed to stdout for render_core.py.
@@ -8,7 +9,6 @@
 --   python3 tool/modelsnap/render_core.py --snapshot /tmp/hat.json --out hat.png
 
 local Roblox = require("@ReplicatedStorage/Shared/RobloxCliShim")
-task = Roblox.task
 local Snapshot = require("@modelsnap/snapshot")
 
 local game = Roblox.game
@@ -16,7 +16,7 @@ local RS = game:GetService("ReplicatedStorage")
 
 -- Require a module through the shim's WaitForChild chain so its module tree
 -- resolves the alias. (Direct `require("@ReplicatedStorage/...")` also works.)
-local function need(...)
+local function _need(...)
 	local node = RS
 	for _, name in { ... } do
 		node = node:WaitForChild(name)
@@ -27,12 +27,12 @@ end
 -- ── Add your build targets here. Each is `name = function() return Model[, label] end`.
 local TARGETS = {
 	-- item = function()
-	-- 	local ItemPreview = need("Builders", "ItemPreview")
-	-- 	local Items = need("Data", "Items")
+	-- 	local ItemPreview = _need("Builders", "ItemPreview")
+	-- 	local Items = _need("Data", "Items")
 	-- 	return ItemPreview.Build(Items.Resolve("SomeItemId")), "Some Item"
 	-- end,
 	-- weapon = function()
-	-- 	local WeaponBuilder = need("Builders", "WeaponBuilder")
+	-- 	local WeaponBuilder = _need("Builders", "WeaponBuilder")
 	-- 	return WeaponBuilder.Build("Sword"), "Sword"
 	-- end,
 }

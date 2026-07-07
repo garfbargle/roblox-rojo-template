@@ -8,11 +8,9 @@ The framework consists of three core scripts:
 
 | Script                      | Location (Recommended)              | Purpose                          |
 |----------------------------|-------------------------------------|----------------------------------|
-| `ModuleLoader.luau`        | `ReplicatedStorage/Source`          | Shared loader logic              |
-| `ServerModuleLoader.server.luau` | `ServerScriptService/Source`     | Entry point for server modules   |
-| `ClientModuleLoader.client.luau` | `StarterPlayerScripts/Source`    | Entry point for client modules   |
-
-> 💡 You may use `/src` instead of `/Source` if preferred — both are supported by the template structure.
+| `ModuleLoader.luau`        | `ReplicatedStorage/Utils`           | Shared loader logic              |
+| `ServerModuleLoader.server.luau` | `ServerScriptService`          | Entry point for server modules   |
+| `ClientModuleLoader.client.luau` | `StarterPlayerScripts`         | Entry point for client modules   |
 
 ## 🧠 Design Philosophy
 
@@ -31,9 +29,9 @@ This implicit dependency handling avoids the need for complex graphs or manual o
 ## 📦 How to Use
 
 1. Place your modules inside the appropriate service folder:
-   - Server-only modules → `ServerScriptService/Source`
-   - Client-only modules → `StarterPlayerScripts/Source`
-   - Shared modules → `ReplicatedStorage/Source`
+   - Server-only modules -> `ServerScriptService/Services`
+   - Client-only modules -> `StarterPlayerScripts/Controllers`
+   - Shared modules -> `ReplicatedStorage/Utils` or another folder under `ReplicatedStorage`
 
 2. Each module can optionally define one or both lifecycle methods:
 
@@ -71,16 +69,16 @@ To keep your project organized, we recommend placing these files in:
 
 ```
 ReplicatedStorage/
-└── Source/
+└── Utils/
     └── ModuleLoader.luau
 
 ServerScriptService/
-└── Source/
-    └── ServerModuleLoader.server.luau
+└── ServerModuleLoader.server.luau
+└── Services/
 
 StarterPlayerScripts/
-└── Source/
-    └── ClientModuleLoader.client.luau
+└── ClientModuleLoader.client.luau
+└── Controllers/
 ```
 
 ---

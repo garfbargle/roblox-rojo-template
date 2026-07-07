@@ -13,8 +13,10 @@
     without typing out typo-prone string literals.
 ]]
 
-export type EnumType = ""
+export type EnumType = "ExampleRemoteFunction"
 
-local RemoteFunctionName = {}
+local RemoteFunctionName = {
+	ExampleRemoteFunction = "ExampleRemoteFunction" :: "ExampleRemoteFunction",
+}
 
 return RemoteFunctionName

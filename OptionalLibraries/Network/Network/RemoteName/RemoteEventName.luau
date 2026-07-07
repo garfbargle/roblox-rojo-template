@@ -5,12 +5,11 @@
     without typing out typo-prone string literals.
 ]]
 
-export type EnumType = "ExampleRemote1"
-    | "ExampleRemote2"
+export type EnumType = "ExampleRemote1" | "ExampleRemote2"
 
 local RemoteEventName = {
-    ExampleRemote1 = "ExampleRemote1" :: "ExampleRemote1",
-    ExampleRemote2 = "ExampleRemote2" :: "ExampleRemote2",
+	ExampleRemote1 = "ExampleRemote1" :: "ExampleRemote1",
+	ExampleRemote2 = "ExampleRemote2" :: "ExampleRemote2",
 }
 
 return RemoteEventName

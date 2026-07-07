@@ -62,7 +62,8 @@ local Players = {
 		model.PrimaryPart = root
 		part("UpperTorso", Vector3.new(1.8, 1.5, 0.8), CFrame.new(0, 0.8, 0), desc.TorsoColor).Parent = model
 		part("Head", Vector3.new(1.1, 1.1, 1.1), CFrame.new(0, 2.05, 0), desc.HeadColor).Parent = model
-		part("RightHand", Vector3.new(0.45, 0.45, 0.45), CFrame.new(-1.25, 0.15, -0.05), desc.RightArmColor).Parent = model
+		part("RightHand", Vector3.new(0.45, 0.45, 0.45), CFrame.new(-1.25, 0.15, -0.05), desc.RightArmColor).Parent =
+			model
 		part("LeftHand", Vector3.new(0.45, 0.45, 0.45), CFrame.new(1.25, 0.15, -0.05), desc.LeftArmColor).Parent = model
 		newInstance("Humanoid").Parent = model
 		return model

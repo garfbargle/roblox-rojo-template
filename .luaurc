@@ -1,0 +1,6 @@
+{
+	"aliases": {
+		"ReplicatedStorage": "./src/ReplicatedStorage",
+		"modelsnap": "./tool/modelsnap"
+	}
+}

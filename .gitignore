@@ -1,11 +1,21 @@
-# Project place file
-/Commission.rbxlx
+# Local macOS metadata
+.DS_Store
+
+# Generated Python cache files
+__pycache__/
+*.py[cod]
+
+# Local Roblox place/model files
+/*.rbxl
+/*.rbxlx
+/*.rbxm
+/*.rbxmx
 
 # Roblox Studio lock files
 /*.rbxlx.lock
 /*.rbxl.lock
 
-#OtherScripts/
-sourcemap.json
-
+# Rojo/generated output
+/sourcemap.json
+/output/
 

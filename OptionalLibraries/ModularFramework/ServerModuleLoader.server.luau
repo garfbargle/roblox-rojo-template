@@ -1,5 +1,8 @@
+--!strict
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 
-local ModuleLoader = require(ReplicatedStorage.Source.ModuleLoader)
+local ModuleLoader = require(ReplicatedStorage.Utils.ModuleLoader)
+local servicesFolder = ServerScriptService:WaitForChild("Services")
 
-ModuleLoader()
+ModuleLoader(servicesFolder)

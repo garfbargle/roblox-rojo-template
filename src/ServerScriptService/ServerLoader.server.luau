@@ -1,3 +1,4 @@
+--!strict
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
@@ -7,4 +8,4 @@ local Loader = require(ReplicatedStorage.Utils.Loader)
 local servicesFolder = ServerScriptService:WaitForChild("Services")
 Loader.Load(servicesFolder)
 
-print("Server Bootstrapped via Loader")
+print("Server bootstrapped via Loader")

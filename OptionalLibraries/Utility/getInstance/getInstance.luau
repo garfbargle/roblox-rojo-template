@@ -10,10 +10,8 @@
 ]]
 local function getInstance<T>(instance: Instance, ...: string): T
 	for _, childName in { ... } do
-		local child = assert(
-			instance:FindFirstChild(childName),
-			`{childName} is not a child of {instance:GetFullName()}`
-		)
+		local child =
+			assert(instance:FindFirstChild(childName), `{childName} is not a child of {instance:GetFullName()}`)
 		instance = child
 	end
 

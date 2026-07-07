@@ -191,7 +191,10 @@ cframeMeta.__index = function(t, key)
 	elseif key == "Inverse" then
 		return function(self)
 			local invRot = matTranspose(self.Rotation)
-			return cframeFrom(matVec(invRot, Core.Vector3.new(-self.Position.X, -self.Position.Y, -self.Position.Z)), invRot)
+			return cframeFrom(
+				matVec(invRot, Core.Vector3.new(-self.Position.X, -self.Position.Y, -self.Position.Z)),
+				invRot
+			)
 		end
 	elseif key == "ToObjectSpace" then
 		return function(self, cf)
@@ -436,8 +439,7 @@ function instanceMethods:GetAttribute(name: string): any
 	return self._attributes[name]
 end
 
-function instanceMethods:SetStateEnabled(_state: any, _enabled: boolean)
-end
+function instanceMethods:SetStateEnabled(_state: any, _enabled: boolean) end
 
 -- Playback/animation no-ops: builders that wire up Sound/Tween/ParticleEmitter at
 -- build time call these immediately; offline they just need to not error.
@@ -586,7 +588,11 @@ Core.UDim2 = {
 
 -- Cosmetic-only constructors (tweens never play, Rect is UI/texture data); the
 -- builders just need `.new` to exist so a SurfaceGui/decal call doesn't abort.
-Core.TweenInfo = { new = function(...) return { ... } end }
+Core.TweenInfo = {
+	new = function(...)
+		return { ... }
+	end,
+}
 Core.Rect = {
 	new = function(minX: any?, minY: number?, maxX: number?, maxY: number?)
 		if type(minX) == "table" then
@@ -682,15 +688,37 @@ local terrainStub = setmetatable({ ClassName = "Terrain", Name = "Terrain" }, {
 })
 Core.workspace = setmetatable({ Terrain = terrainStub }, {
 	__index = function(_, _key)
-		return function() return nil end -- Raycast and friends
+		return function()
+			return nil
+		end -- Raycast and friends
 	end,
 })
 
-Core.NumberRange = { new = function(min: number?, max: number?) return { Min = min or 0, Max = max or min or 0 } end }
-Core.NumberSequenceKeypoint = { new = function(time: number, value: number) return { Time = time, Value = value } end }
-Core.NumberSequence = { new = function(value: any) return value end }
-Core.ColorSequenceKeypoint = { new = function(time: number, value: any) return { Time = time, Value = value } end }
-Core.ColorSequence = { new = function(a: any, b: any?) return { a, b } end }
+Core.NumberRange = {
+	new = function(min: number?, max: number?)
+		return { Min = min or 0, Max = max or min or 0 }
+	end,
+}
+Core.NumberSequenceKeypoint = {
+	new = function(time: number, value: number)
+		return { Time = time, Value = value }
+	end,
+}
+Core.NumberSequence = {
+	new = function(value: any)
+		return value
+	end,
+}
+Core.ColorSequenceKeypoint = {
+	new = function(time: number, value: any)
+		return { Time = time, Value = value }
+	end,
+}
+Core.ColorSequence = {
+	new = function(a: any, b: any?)
+		return { a, b }
+	end,
+}
 
 Core.Random = {
 	new = function(seed: number?)
@@ -747,9 +775,25 @@ Core.task = {
 
 -- Constructors copied into every Composed shim table.
 local API_FIELDS = {
-	"Color3", "Vector2", "Vector3", "CFrame", "Enum", "Instance", "UDim", "UDim2",
-	"NumberRange", "NumberSequenceKeypoint", "NumberSequence",
-	"ColorSequenceKeypoint", "ColorSequence", "TweenInfo", "Rect", "Random", "workspace", "folder", "newInstance",
+	"Color3",
+	"Vector2",
+	"Vector3",
+	"CFrame",
+	"Enum",
+	"Instance",
+	"UDim",
+	"UDim2",
+	"NumberRange",
+	"NumberSequenceKeypoint",
+	"NumberSequence",
+	"ColorSequenceKeypoint",
+	"ColorSequence",
+	"TweenInfo",
+	"Rect",
+	"Random",
+	"workspace",
+	"folder",
+	"newInstance",
 }
 
 -- Compose a full per-game shim table from this core plus game-specific pieces:
@@ -768,14 +812,15 @@ function Core.Compose(opts)
 
 	local services = opts.services or {}
 	local replicatedStorage = opts.replicatedStorage
-	local players = opts.players or {
-		GetPlayers = function()
-			return {}
-		end,
-		GetPlayerFromCharacter = function()
-			return nil
-		end,
-	}
+	local players = opts.players
+		or {
+			GetPlayers = function()
+				return {}
+			end,
+			GetPlayerFromCharacter = function()
+				return nil
+			end,
+		}
 
 	shim.game = {
 		GetService = function(_, name: string)

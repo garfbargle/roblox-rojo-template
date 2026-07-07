@@ -1,12 +1,14 @@
+--!strict
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local StarterPlayer = game:GetService("StarterPlayer")
-local StarterPlayerScripts = Players.LocalPlayer:WaitForChild("PlayerScripts")
+
+local localPlayer = Players.LocalPlayer
+local playerScripts = localPlayer:WaitForChild("PlayerScripts")
 
 local Loader = require(ReplicatedStorage.Utils.Loader)
 
 -- Load all controllers
-local controllersFolder = StarterPlayerScripts:WaitForChild("Controllers")
+local controllersFolder = playerScripts:WaitForChild("Controllers")
 Loader.Load(controllersFolder)
 
-print("Client Bootstrapped via Loader")
+print("Client bootstrapped via Loader")
