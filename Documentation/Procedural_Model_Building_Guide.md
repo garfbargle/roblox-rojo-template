@@ -18,7 +18,8 @@ Procedural building has **no live preview while you edit**. You write coordinate
 sizes, and rotation signs blind, and the same handful of mistakes recur on every
 model: a cylinder comes out sideways, a trim flickers against the shell it sits on,
 a roof flies off because a rotation sign was backwards, a "ball" shrinks to a dot, a
-character's pose does nothing because the rig has no joints to drive.
+finished model lies down when the game places it because its PrimaryPart carried a
+rotation, a character's pose does nothing because the rig has no joints to drive.
 
 None of these are hard once you know them, and none are discoverable by reading the
 code back — the code looks correct. They are only visible in-engine, or in a render.
@@ -79,6 +80,48 @@ faking these two shapes and hiding builder bugs, not a lighting problem.
 is suspect — un-rotated ones were probably authored as sideways slabs by accident.
 Sweep them per-model.
 
+## 4. A rotated `PrimaryPart` tips the whole model over on placement
+
+A `Model`'s pivot is its `PrimaryPart`'s CFrame — **rotation included**
+(`GetPivot() = PrimaryPart.CFrame * PrimaryPart.PivotOffset`, and `PivotOffset`
+defaults to identity). Every placement done with `model:PivotTo(uprightTarget)`
+aligns that pivot to the target, so whatever rotation is baked into the
+PrimaryPart's CFrame gets **un-rotated out of the entire model**.
+
+The killer combination is section 1: standing a cylinder up (trunk, post, basin,
+mound, fountain wall) bakes a 90° axis-fix rotation into its CFrame. Make that
+part the PrimaryPart — the natural choice, it's the base of the model — and every
+`PivotTo`-based placement lays the model **on its side**. A merely *tilted*
+primary is the same bug at smaller scale: a 13°-leaning easel leg as PrimaryPart
+leans the whole easel 13° in its display bay.
+
+**Real shipped bug:** half a model library displayed sideways in its warehouse.
+The symptom pattern was the diagnosis: every sideways model had a cylinder
+PrimaryPart (palm trunk, signpost post, pond basin, meadow mound); every upright
+model had a box. And because the offline renderer draws raw part CFrames and
+never consults the pivot (Part F), **every snapshot looked perfect** while the
+warehouse was wrong.
+
+**The fix — normalize the pivot once, in the shared finalize path:**
+
+```lua
+model.PrimaryPart = primary
+-- pivot becomes the build-space origin with identity rotation:
+-- upright, at the ground point under the model, facing -Z
+primary.PivotOffset = primary.CFrame:Inverse()
+```
+
+Since `CFrame * CFrame:Inverse() == identity`, the model's pivot is now exactly
+the build convention (origin on the ground plane, un-rotated) regardless of which
+part is primary or how that part is rotated. Put this in the shared
+`finalize` / `EnsurePrimaryPart` code, not in individual builders — per-model
+fixes miss the next model. The offset travels with clones, so downstream
+`PivotTo` placement is correct everywhere, not just in one display system.
+
+**Symptom → cause:** "renders fine offline, sideways (or subtly tilted) when
+placed in-game" ⇒ check the PrimaryPart's rotation before suspecting anything
+else.
+
 ---
 
 # Part B: Z-Fighting — The Coplanar-Face Rule
@@ -87,7 +130,7 @@ Z-fighting is two coplanar faces at the same depth flickering against each other
 the camera moves. In procedural builds it has **one dominant cause and a purely
 arithmetic test** — you can find it without ever running the game.
 
-## 4. The cause
+## 5. The cause
 
 Two parts under the **same anchor/parent** whose face planes **coincide on one axis**
 while they **overlap on the other two**. It is *visible* when the two faces differ in
@@ -103,7 +146,7 @@ y faces: oy ± sy/2
 z faces: oz ± sz/2
 ```
 
-## 5. The detection test
+## 6. The detection test
 
 Two parts **A** and **B** z-fight when, **on exactly one axis**,
 
@@ -123,7 +166,7 @@ offA ± sizeA/2  ==  offB ± sizeB/2      (same ± sign = same outward-facing si
   the plane — those parts are off-plane and can be skipped (blades, bow limbs, faceted
   gems, angled roof slabs).
 
-## 6. The fix
+## 7. The fix
 
 Nudge the **decorative** part's offset **proud** of the shell by ~`0.02`–`0.04` studs
 along the contested axis, so its outward face sits just outside the shell's face
@@ -149,7 +192,7 @@ coordinates** parented to one named `Model`. There is no live preview, so the sa
 mistakes recur. Check every one of these before calling a structure done — they look
 fine in code and break in-game.
 
-## 7. A local-offset placement helper
+## 8. A local-offset placement helper
 
 Copy this pattern. It places a part by **local offset** from the structure center,
 treats `oy` as an **absolute world Y** when you need a real floor height, and lets an
@@ -174,7 +217,7 @@ The point is one consistent frame of reference for the whole build so you can re
 about positions, plus a clean escape hatch (`opts.CFrame`) for the parts that need a
 bespoke rotation.
 
-## 8. Orientation / rotation sign — reason, don't eyeball
+## 9. Orientation / rotation sign — reason, don't eyeball
 
 `CFrame.Angles` follows the right-hand rule and the sign is easy to get backwards
 (this inverted *every* roof on a first pass). Don't guess — decide **which edge must
@@ -189,7 +232,7 @@ end up lower**, then pick the sign:
 
 When a roof, awning, or ramp looks inverted or flies off, the sign is wrong. Flip it.
 
-## 9. Connectivity — stairs and floors you can actually use
+## 10. Connectivity — stairs and floors you can actually use
 
 - A stair is only usable if you can **walk off the top**. The top step must land
   **flush on a real floor panel** — never over a void (you fall through), never
@@ -201,7 +244,7 @@ When a roof, awning, or ramp looks inverted or flies off, the sign is wrong. Fli
   that leave a **seam** are fine. Don't floor a space you can't enter — give it a
   door/stair or don't cap it.
 
-## 10. Sealing rooms — a gap is a free entrance
+## 11. Sealing rooms — a gap is a free entrance
 
 - A "wall" with a gap is a door you didn't mean to make. When gating with a teleport
   ward (a collidable veil + prompt), the veil only blocks **its own opening** — you
@@ -209,7 +252,7 @@ When a roof, awning, or ramp looks inverted or flies off, the sign is wrong. Fli
   two walls nearly meet. A 2–3 stud corner gap is walk-through.
 - Verify there is **exactly one** intended way into a gated room.
 
-## 11. Terrain carving breaches and the ground-height trap
+## 12. Terrain carving breaches and the ground-height trap
 
 - `carveCavern` / `carveTunnel`-style terrain cuts can **breach the hillside**: a cave
   whose ceiling rises above the (often lower-than-you-think) surface pokes a visible
@@ -224,14 +267,14 @@ When a roof, awning, or ramp looks inverted or flies off, the sign is wrong. Fli
   height and don't assume the visible floor is the surface. When something floats or
   sinks, re-derive the floor Y from the terrain, not from your deck part.
 
-## 12. Collision policy
+## 13. Collision policy
 
 Players forgive a lot but they notice walking **through a roof**. Make roof slabs,
 awnings, and walls **collidable**; keep tiny trim (ridge beams, rails, gable caps,
 decorative seams) **non-collidable** so players don't snag on them. Default decorative
 parts to `CanCollide = false` and opt the structural ones back in.
 
-## 13. Sittable furniture — the seat faces −Z
+## 14. Sittable furniture — the seat faces −Z
 
 A visible cushion is not a seat. Add a real `Instance.new("Seat")` at cushion-top
 height; the engine auto-seats whoever steps on it. The occupant **faces the seat's
@@ -245,7 +288,7 @@ seat.CFrame = CFrame.lookAt(pos, pos + faceDir)   -- sitter ends up looking towa
 Prompts still fire while seated, so a bench inside an interaction's activation radius
 lets players use that interaction sitting down.
 
-## 14. Reuse the real model, not a look-alike
+## 15. Reuse the real model, not a look-alike
 
 For static display of something that exists as a gameplay model (a held weapon, a
 prop), **build the actual in-game model** and freeze it, rather than re-modeling a
@@ -268,7 +311,7 @@ rig has to be built so the joints exist and the skeleton actually hangs off the 
 you intend to animate. Two failures here make perfectly-correct animation code a
 silent no-op.
 
-## 15. Motor6D rigs vs constraint rigs — know which you have
+## 16. Motor6D rigs vs constraint rigs — know which you have
 
 - **Classic / custom rigs** join parts with `Motor6D`. You pose them by writing
   `Motor6D.Transform` (or `.C0`). This is what you get when you build a rig by hand.
@@ -284,7 +327,7 @@ works on both classic and modern rigs — it is the reliable poser when you don'
 control how the rig was built. Reach for `Motor6D.Transform`/`.C0` only on rigs you
 built yourself and know have Motor6Ds.
 
-## 16. The skeleton must hang off the joint you animate
+## 17. The skeleton must hang off the joint you animate
 
 A procedural body-bob / lean / breathe is applied as a `Motor6D.C0` offset on a hub
 joint **between** the kinematic root and the rest of the skeleton. For it to do
@@ -310,14 +353,14 @@ Everything *looked* wired up.
 (the tail wags) but the bob doesn't, the motors are fine — the bobbed part just isn't
 carrying the skeleton.
 
-## 17. IK and C0 don't fight when they target different joints
+## 18. IK and C0 don't fight when they target different joints
 
 Leg IK writes the **leg-joint** `Transform`; the bob/lean writes the **hip-hub** `C0`;
 the tail sway writes the **tail-joint** `C0`. Because they target different joints they
 compose cleanly and never conflict. This layering — IK for ground contact and aim, C0
 for secondary motion — is the whole trick to combining the two systems.
 
-## 18. Build a real bend into the rest pose, or the limb can't stride
+## 19. Build a real bend into the rest pose, or the limb can't stride
 
 A leg built as a straight line from hip to foot (`mid = hip:Lerp(foot, 0.5)`) makes the
 two bone segments sum to *exactly* the hip→foot drop. The limb stands fully extended,
@@ -346,7 +389,7 @@ The IKControls guide covers IK motion in full. The single principle worth repeat
 here, because it recurs in **every** system that places a limb on a **moving** body —
 IK feet, IK guard hands, even Motor6D secondary motion — is:
 
-## 19. Smooth in body-LOCAL space, not world space
+## 20. Smooth in body-LOCAL space, not world space
 
 If you ease (lerp / exponential-approach) a target's **world** position toward a goal
 that is rigidly offset from a moving root, the smoothed value **lags the body** by an
@@ -377,7 +420,7 @@ poles) don't lag — leave them.
 Drive these in a `RenderStep` bound **after** the body settles (`Character` priority +
 1) so the offset reads against this frame's final body position.
 
-## 20. Two more secondary-motion notes
+## 21. Two more secondary-motion notes
 
 - **Cadence:** scale the bob / arm-swing phase **with the gait**. A fast runner whose
   upper body heaves at a fixed slow cadence reads as weak and disconnected. And watch
@@ -399,7 +442,7 @@ of the engine globals), then **rasterize** that JSON to a PNG — lets you eyeba
 model in ~0.5s without opening the editor. Render every model you build or change and
 **show the PNG** so it can be judged.
 
-## 21. What the renderer mirrors, and what it can't
+## 22. What the renderer mirrors, and what it can't
 
 It **does** mirror the real shape rules (Part A): `Cylinder` along local X, `Ball` as
 a min-axis sphere, real `CFrame.lookAt` orientation — so geometry is trustworthy.
@@ -414,8 +457,13 @@ It **does not** model:
 - **Runtime-set appearance.** Properties set *after* build by runtime code (a gate's
   transparency toggled later, GUIs, dynamic lights) — the CLI captures **build-time
   state only**.
+- **Pivots and placement.** The renderer draws each part's raw world CFrame and
+  never consults `GetPivot`/`PivotOffset`, so a broken model pivot (section 4)
+  renders perfectly and only fails when the game `PivotTo`s the model into place.
+  Verify pivots with arithmetic (`GetPivot()` rotation must be identity), not with
+  a render.
 
-## 22. Read interiors with a top-down PLAN view, not an oblique angle
+## 23. Read interiors with a top-down PLAN view, not an oblique angle
 
 A simple rasterizer has **no per-pixel z-buffer** — it sorts whole parts by center
 depth. In a packed interior an oblique 3/4 view reads ambiguously: furniture occludes
@@ -424,14 +472,14 @@ furniture and a part can **look misplaced when it isn't**. A near-top-down shot
 occlusion confusion. **Cross-check an oblique view against a plan view before
 concluding a part is in the wrong place.**
 
-## 23. Frame embedded builds with focus + span
+## 24. Frame embedded builds with focus + span
 
 Auto-fit frames the whole bounding box. A landmark with a long approach (a tunnel, a
 distant signpost) blows the box out so the room renders tiny. Aim the camera with a
 `--focus "x,y,z"` point and set the zoom with a `--span N` (world units) so the room
 fills the frame.
 
-## 24. The shim is a *partial* emulation — failures are silent or wrong, not loud
+## 25. The shim is a *partial* emulation — failures are silent or wrong, not loud
 
 The CLI shim stubs engine globals (`Instance`, `CFrame`, `Vector3`, …) so builders run
 headless. It is **partial**. Gaps surface two ways:
@@ -460,6 +508,7 @@ renderable.
 **Geometry**
 - [ ] No un-rotated `Cylinder` meant to be a flat disc (it's a sideways slab).
 - [ ] No stretched `Ball` meant to be elongated (it's a min-axis sphere); shells/helmets are Blocks.
+- [ ] Model pivot has identity rotation (`PivotOffset = PrimaryPart.CFrame:Inverse()` in finalize) — a rotated cylinder/tilted PrimaryPart otherwise lays the model sideways on `PivotTo`.
 - [ ] Ran the coplanar-face test on color/material-differing sibling pairs; trims sit ~0.02–0.04 proud.
 
 **Structure**
